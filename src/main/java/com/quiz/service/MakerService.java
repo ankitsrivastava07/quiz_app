@@ -1,16 +1,39 @@
 package com.quiz.service;
 
+import com.mongodb.client.ClientSession;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.model.*;
+import com.mongodb.client.result.UpdateResult;
 import com.quiz.dao.repository.*;
 import com.quiz.dto.ApiResponse;
 import com.quiz.dto.CategoryDto;
 import com.quiz.dto.SubCategoryRequestDto;
 import com.utility.service.MongoDbBuilder;
+import org.bson.Document;
+import org.bson.conversions.Bson;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static com.utility.constant.UtilityConstant.*;
+
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOptions;
+import org.bson.Document;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.UUID;
 
 @Service
 public class MakerService {
@@ -18,14 +41,17 @@ public class MakerService {
     private CourseRepo courseRepo;
     private MongoDbBuilder mongoDbBuilder;
     private SubCategoryRepository subCategoryRepository;
+    private MongoTemplate mongoTemplate;
 
     public MakerService(CategoryRepository categoryRepository,
                         CourseRepo courseRepo,
-                        MongoDbBuilder mongoDbBuilder, SubCategoryRepository subCategoryRepository) {
+                        MongoDbBuilder mongoDbBuilder,
+                        SubCategoryRepository subCategoryRepository, MongoTemplate mongoTemplate) {
         this.categoryRepository = categoryRepository;
         this.courseRepo = courseRepo;
         this.mongoDbBuilder = mongoDbBuilder;
         this.subCategoryRepository = subCategoryRepository;
+        this.mongoTemplate = mongoTemplate;
     }
 
     public ApiResponse createCategoryEntity(CategoryDto categoryDto) {
@@ -35,7 +61,8 @@ public class MakerService {
         categoryEntity.setTitle(categoryDto.getTitle());
         categoryEntity.setDescription(categoryDto.getDescription());
         //   categoryEntity = categoryRepository.save(categoryEntity);
-        categoryEntity = mongoDbBuilder.saveEntity(categoryEntity, "category");
+        //  categoryEntity = mongoDbBuilder.saveEntity(categoryEntity, "category");
+        categoryEntity = categoryRepository.save(categoryEntity);
         return
                 new
                         ApiResponse
@@ -61,7 +88,7 @@ public class MakerService {
         subCategoryEntity.setName(categoryDto.getName());
         subCategoryEntity.setDescription(categoryDto.getDescription());
         CategoryEntity categoryEntity = mongoDbBuilder
-                .insertToNode(id, subCategoryEntity, CategoryEntity.class);
+                .insertToNode(id, "subcategories", subCategoryEntity, CategoryEntity.class);
         return new
                 ApiResponse
                         .ApiResponseBuilder()
@@ -73,16 +100,6 @@ public class MakerService {
     }
 
     public ApiResponse findById(String id) {
-        /*return
-                new
-                        ApiResponse
-                                .ApiResponseBuilder()
-                        .setData(Objects.equals(id, "id") ? categoryRepository.findAll()
-                                : mongoDbBuilder.findById(id, "subCategory.id", CategoryEntity.class))
-                        .setFlag(Boolean.TRUE)
-                        .setMsg("Success")
-                        .build();*/
-
         return new ApiResponse
                 .ApiResponseBuilder()
                 .setFlag(TRUE)
@@ -98,23 +115,25 @@ public class MakerService {
     }
 
     public ApiResponse saveSubcategoryToSubcategory(SubCategoryRequestDto subCategoryRequestDto) {
-        SubCategoryEntity subCategoryEntity = subCategoryRepository
-                .findById(subCategoryRequestDto.getId())
-                .get();
+        List<SubCategoryEntity> subCategoryEntityList = subCategoryRequestDto.getSubcategory().stream().map(e -> {
+            SubCategoryEntity s = new SubCategoryEntity();
+            s.setName(e.getName());
+            s.setDescription(e.getDescription());
+            return s;
+        }).toList();
 
-        subCategoryEntity.setSubcategory(subCategoryRequestDto.getSubcategory().stream().map(e -> {
-            SubCategoryEntity subCategoryEntity1 = new SubCategoryEntity();
-            subCategoryEntity1.setName(e.getName());
-            subCategoryEntity1.setDescription(e.getDescription());
-            return subCategoryEntity1;
-        }).collect(Collectors.toList()));
+        Query query = new Query(Criteria.where("_id").is(subCategoryRequestDto.getCategoryId())
+                .and("subcategories._id").is(subCategoryRequestDto.getId()));
+        Update update = new Update().push("subcategories.$[elem].subcategories").each(subCategoryEntityList)
+                .filterArray(Criteria.where("elem._id").is(subCategoryRequestDto.getId()));
 
+        CategoryEntity updatedCategory = mongoTemplate.findAndModify(query, update,
+                FindAndModifyOptions.options().returnNew(true), CategoryEntity.class);
         return new ApiResponse
                 .ApiResponseBuilder()
                 .setFlag(true)
                 .setMsg("Success")
-                .setData(subCategoryRepository.save(subCategoryEntity))
+                .setData(updatedCategory)
                 .build();
     }
-
 }

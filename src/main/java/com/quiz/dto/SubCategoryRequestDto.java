@@ -8,6 +8,16 @@ public class SubCategoryRequestDto {
     private String id;
     private String name;
     private String description;
+    private String categoryId;
+
+    public String getCategoryId() {
+        return categoryId;
+    }
+
+    public void setCategoryId(String categoryId) {
+        this.categoryId = categoryId;
+    }
+
 
     public String getId() {
         return id;

@@ -1,24 +1,25 @@
 package com.quiz.dao.repository;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document(collection = "subcategory")
+//@Document(collection = "subcategory")
 public class SubCategoryEntity {
-    @Id
     private String id;
     private String name;
     private String description;
-    private List<SubCategoryEntity> subcategory;
+    private List<SubCategoryEntity> subcategories = new ArrayList<>();
 
     public List<SubCategoryEntity> getSubcategory() {
-        return subcategory;
+        return subcategories;
     }
 
     public void setSubcategory(List<SubCategoryEntity> subcategory) {
-        this.subcategory = subcategory;
+        this.subcategories = subcategory;
     }
 
     public SubCategoryEntity() {
